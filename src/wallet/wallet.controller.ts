@@ -10,6 +10,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { WalletService } from './wallet.service';
 
+
 interface JwtPayload {
   userId: number;
   email: string;
@@ -47,3 +48,4 @@ export class WalletController {
     return { message: 'Transfer successful' };
   }
 }
+
