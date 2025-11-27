@@ -72,18 +72,38 @@ export class WalletService {
   
 }
 
-  async withdraw(userId: number, amount: number) {
-    if (amount <= 0) throw new BadRequestException('Amount must be positive');
-    const safeAmount = Number(amount.toFixed(2)); 
+ async withdraw(userId: number, amount: number) {
+  if (amount <= 0) throw new BadRequestException('Amount must be positive');
+  const safeAmount = Number(amount.toFixed(2));
 
-    const wallet = await this.repo.findOne({ where: { userId } });
-    if (!wallet || wallet.balance < safeAmount) {
+  const queryRunner = this.dataSource.createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
+
+  try {
+    
+    const wallet = await queryRunner.manager.findOne(Wallet, {
+    where: { userId },
+    lock: { mode: 'pessimistic_write' },
+    });   
+
+    if (!wallet) {
+      throw new BadRequestException('Wallet not found');
+    }
+
+    
+    const currentBalance = typeof wallet.balance === 'string'
+      ? parseFloat(wallet.balance)
+      : wallet.balance;
+
+    if (currentBalance < safeAmount) {
       throw new BadRequestException('Insufficient balance');
     }
 
-    const newBalance = Number((wallet.balance - safeAmount).toFixed(2)); 
+    const newBalance = Number((currentBalance - safeAmount).toFixed(2));
     wallet.balance = newBalance;
-    await this.repo.save(wallet);
+
+    await queryRunner.manager.save(wallet);
 
     await this.transactionService.log({
       type: 'withdraw' as TransactionType,
@@ -91,8 +111,16 @@ export class WalletService {
       fromUserId: userId,
       description: 'Withdrawal',
       walletId: wallet.id,
-    });
+    }, queryRunner.manager); 
+
+    await queryRunner.commitTransaction();
+  } catch (err) {
+    await queryRunner.rollbackTransaction();
+    throw err;
+  } finally {
+    await queryRunner.release();
   }
+}
 
   async transfer(fromUserId: number, toUserId: number, amount: number) {
     if (amount <= 0) throw new BadRequestException('Amount must be positive');
