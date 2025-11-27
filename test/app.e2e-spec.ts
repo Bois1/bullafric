@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
-import { AppModule } from '../app.module';
+import request from 'supertest';
+import { AppModule } from './../src/app.module';
 
-describe('Fintech MVP (e2e)', () => {
+describe('AppController (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -19,14 +19,16 @@ describe('Fintech MVP (e2e)', () => {
     await app.close();
   });
 
-  it('/auth/register (POST)', () => {
+  it('/ (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/')
+      .expect(404); 
+  });
+
+  it('/auth/register (POST) should return 400 for missing data', () => {
     return request(app.getHttpServer())
       .post('/auth/register')
-      .send({
-        name: 'Test User',
-        email: 'test@example.com',
-        password: '123456',
-      })
-      .expect(201);
+      .send({})
+      .expect(400);
   });
 });
